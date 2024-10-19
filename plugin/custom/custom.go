@@ -18,7 +18,7 @@ import (
 func init() {
 	engine := control.AutoRegister(&ctrl.Options[*zero.Ctx]{
 		DisableOnDefault: false,
-		Brief:    "自定义工具",
+		Brief:            "自定义工具",
 		Help: " - /kill\n" +
 			" - /发送公告\n" +
 			" - @bot给主人留言<内容>\n" +
