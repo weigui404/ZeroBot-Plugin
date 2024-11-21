@@ -12,7 +12,7 @@ import (
 
 const (
 	// baseURL  = "https://api.openai.com/v1/"
-	proxyURL           = "https://ai.555590.xyz/v1/"
+	proxyURL           = "https://openai.starsky.love/v1/"
 	modelGPT3Dot5Turbo = "gpt-3.5-turbo"
 	yunKey             = "7d06a110e9e20a684e02934549db1d3d"
 	yunURL             = "https://api.a20safe.com/api.php?api=35&key=%s&apikey=%s"
