@@ -50,6 +50,7 @@ func init() {
 	mf := en.DataFolder() + "model.txt"
 	sf := en.DataFolder() + "system.txt"
 	pf := en.DataFolder() + "sep.txt"
+	nf := en.DataFolder() + "NoReplyAT"
 	if file.IsExist(mf) {
 		data, err := os.ReadFile(mf)
 		if err != nil {
@@ -74,6 +75,7 @@ func init() {
 			sepstr = string(data)
 		}
 	}
+	noreplyat = file.IsExist(nf)
 
 	en.OnMessage(func(ctx *zero.Ctx) bool {
 		return ctx.ExtractPlainText() != "" && (!noreplyat || (noreplyat && !ctx.Event.IsToMe))
@@ -91,6 +93,9 @@ func init() {
 		rate &= 0xff
 		if !ctx.Event.IsToMe && rand.Intn(100) >= int(rate) {
 			return
+		}
+		if ctx.Event.IsToMe {
+			ctx.Block()
 		}
 		key := ""
 		err := c.GetExtra(&key)
@@ -275,9 +280,8 @@ func init() {
 	en.OnRegex("^设置AI聊天(不)?响应AT$", zero.OnlyPrivate, zero.SuperUserPermission).SetBlock(true).Handle(func(ctx *zero.Ctx) {
 		args := ctx.State["regex_matched"].([]string)
 		isno := args[1] == "不"
-		fp := en.DataFolder() + "NoReplyAT"
 		if isno {
-			f, err := os.Create(fp)
+			f, err := os.Create(nf)
 			if err != nil {
 				ctx.SendChain(message.Text("ERROR: ", err))
 				return
@@ -290,7 +294,7 @@ func init() {
 			}
 			noreplyat = true
 		} else {
-			_ = os.Remove(fp)
+			_ = os.Remove(nf)
 			noreplyat = false
 		}
 		ctx.SendChain(message.Text("成功"))
