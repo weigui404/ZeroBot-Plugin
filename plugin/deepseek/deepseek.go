@@ -1,4 +1,4 @@
-package chatgpt
+package deepseek
 
 import (
 	"bytes"
@@ -12,25 +12,22 @@ import (
 
 const (
 	// baseURL  = "https://api.openai.com/v1/"
-	proxyURL           = "https://openai.starsky.love/v1/"
-	modelGPT3Dot5Turbo = "gpt-3.5-turbo"
-	yunKey             = "7d06a110e9e20a684e02934549db1d3d"
-	yunURL             = "https://api.a20safe.com/api.php?api=35&key=%s&apikey=%s"
+	proxyURL           = "https://api.deepseek.com/v1/"
+	modelTurbo = "deepseek-reasoner"
+	yunURL             = "https://api.deepseek.com/user/balance"
 )
 
 type yun struct {
-	Code int    `json:"code"`
-	Msg  string `json:"msg"`
 	Data []struct {
-		Return    string `json:"return"`
-		Total     string `json:"total"`
-		Available string `json:"available"`
-		Used      string `json:"used"`
-	} `json:"data"`
+	    Currency  string `json:"currency"`
+		Total     string `json:"total_balance"`
+		Granted string `json:"granted_balance"`
+		Topped  string `json:"topped_up_balance"`
+	} `json:"balance_infos"`
 }
 
-// chatGPTResponseBody 响应体
-type chatGPTResponseBody struct {
+// chatResponseBody 响应体
+type chatResponseBody struct {
 	ID      string       `json:"id"`
 	Object  string       `json:"object"`
 	Created int          `json:"created"`
@@ -39,9 +36,9 @@ type chatGPTResponseBody struct {
 	Usage   chatUsage    `json:"usage"`
 }
 
-// chatGPTRequestBody 请求体
-type chatGPTRequestBody struct {
-	Model       string        `json:"model,omitempty"` // gpt3.5-turbo
+// chatRequestBody 请求体
+type chatRequestBody struct {
+	Model       string        `json:"model,omitempty"`
 	Messages    []chatMessage `json:"messages,omitempty"`
 	Temperature float64       `json:"temperature,omitempty"`
 	N           int           `json:"n,omitempty"`
@@ -78,13 +75,13 @@ var client = &http.Client{
 // -H "Content-Type: application/json"
 // -H "Authorization: Bearer YOUR_API_KEY"
 // -d '{ "model": "gpt-3.5-turbo",  "messages": [{"role": "user", "content": "Hello!"}]}'
-func completions(messages []chatMessage, apiKey string) (*chatGPTResponseBody, error) {
-	com := chatGPTRequestBody{
+func completions(messages []chatMessage, apiKey string) (*chatResponseBody, error) {
+	com := chatRequestBody{
 		Messages: messages,
 	}
 	// default model
 	if com.Model == "" {
-		com.Model = modelGPT3Dot5Turbo
+		com.Model = modelTurbo
 	}
 
 	body, err := json.Marshal(com)
@@ -111,7 +108,7 @@ func completions(messages []chatMessage, apiKey string) (*chatGPTResponseBody, e
 		return nil, errors.New("response error: " + strconv.Itoa(res.StatusCode))
 	}
 
-	v := new(chatGPTResponseBody)
+	v := new(chatResponseBody)
 	if err = json.NewDecoder(res.Body).Decode(&v); err != nil {
 		return nil, err
 	}

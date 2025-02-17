@@ -153,7 +153,7 @@ import (
 	// _ "github.com/FloatTech/ZeroBot-Plugin/plugin/wtf"           // 鬼东西
 
 	// personal
-	_ "github.com/FloatTech/ZeroBot-Plugin/plugin/chatgpt"      // chatgpt
+	_ "github.com/FloatTech/ZeroBot-Plugin/plugin/deepseek"      // deepseek
 	_ "github.com/FloatTech/ZeroBot-Plugin/plugin/moehu"      // 图库
 
 	//                               ^^^^                               //

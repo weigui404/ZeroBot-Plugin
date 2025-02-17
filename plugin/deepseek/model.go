@@ -1,4 +1,4 @@
-package chatgpt
+package deepseek
 
 import (
 	"errors"
@@ -41,7 +41,7 @@ type gtoqq struct {
 var (
 	db    = &model{}
 	getdb = fcext.DoOnceOnSuccess(func(ctx *zero.Ctx) bool {
-		db.sql = sql.New(engine.DataFolder() + "chatgpt.db")
+		db.sql = sql.New(engine.DataFolder() + "deepseek.db")
 		err := db.sql.Open(time.Hour * 24)
 		if err != nil {
 			ctx.SendChain(message.Text("ERROR: ", err))
@@ -166,7 +166,7 @@ func (db *model) findkey(gid int64) (content string, err error) {
 	var m key
 	err = db.sql.Find("key", &m, "where qquid = "+strconv.FormatInt(gid, 10))
 	if err != nil {
-		return "", errors.New("账号未绑定OpenAI-apikey,请私聊设置key后使用")
+		return "", errors.New("账号未绑定apikey,请私聊设置key后使用")
 	}
 	return m.Content, nil
 }
@@ -177,7 +177,7 @@ func (db *model) insertgkey(qquid, guid int64) (err error) {
 	var n key
 	err = db.sql.Find("key", &n, "where qquid = "+strconv.FormatInt(qquid, 10))
 	if err != nil || n.Content == "" {
-		return errors.New("授权账号未绑定OpenAI-apikey,请私聊设置key以后使用")
+		return errors.New("授权账号未绑定apikey,请私聊设置key以后使用")
 	}
 	m := gtoqq{
 		GroupID: guid,
@@ -209,12 +209,12 @@ func (db *model) findgkey(gid int64) (content string, err error) {
 	var m gtoqq
 	err = db.sql.Find("gtoqq", &m, "where groupid = "+strconv.FormatInt(gid, 10))
 	if err != nil {
-		return "", errors.New("未设置OpenAI-apikey,请私聊设置key以后授权本群使用")
+		return "", errors.New("未设置apikey,请私聊设置key以后授权本群使用")
 	}
 	var n key
 	err = db.sql.Find("key", &n, "where qquid = "+strconv.FormatInt(m.QQuid, 10))
 	if err != nil || n.Content == "" {
-		return "", errors.New("授权账号未绑定OpenAI-apikey,请私聊设置key以后使用")
+		return "", errors.New("授权账号未绑定apikey,请私聊设置key以后使用")
 	}
 	return n.Content, nil
 }

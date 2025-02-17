@@ -1,9 +1,10 @@
-// Package chatgpt 简易ChatGPT api聊天
-package chatgpt
+// Package deepseek 简易ai api聊天
+package deepseek
 
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -24,23 +25,23 @@ var (
 	cache  = ttl.NewCache[sessionKey, []chatMessage](time.Minute * 15)
 	engine = control.AutoRegister(&ctrl.Options[*zero.Ctx]{
 		DisableOnDefault: false,
-		Brief:            "chatgpt",
-		Help: "-@bot chatgpt [对话内容]\n" +
+		Brief:            "deepseek",
+		Help: "-@bot deepseek [对话内容]\n" +
 			"- 添加预设xxx xxx\n" +
 			"- 设置(默认)预设xxx\n" +
 			"- 删除本群预设\n" +
 			"- 查看预设列表\n" +
 			"- 余额查询\n" +
-			"- (私聊发送)设置OpenAI apikey [apikey]\n" +
+			"- (私聊发送)设置deepseek apikey [apikey]\n" +
 			"- (私聊发送)删除apikey\n" +
 			"- (群聊发送)(授权|取消)(本群|全局)使用apikey\n" +
 			"注:先私聊设置自己的key,再授权群聊使用,不会泄露key的\n",
-		PrivateDataFolder: "chatgpt",
+		PrivateDataFolder: "deepseek",
 	})
 )
 
 func init() {
-	engine.OnRegex(`^(?:chatgpt|//)([\s\S]*)$`, getdb).SetBlock(false).
+	engine.OnRegex(`^(?:deepseek|//)([\s\S]*)$`, getdb).SetBlock(false).
 		Handle(func(ctx *zero.Ctx) {
 			var messages []chatMessage
 			args := ctx.State["regex_matched"].([]string)[1]
@@ -92,7 +93,7 @@ func init() {
 			})
 			resp, err := completions(messages, apiKey)
 			if err != nil {
-				ctx.SendChain(message.Text("请求ChatGPT失败: ", err))
+				ctx.SendChain(message.Text("请求deepseek失败: ", err))
 				return
 			}
 			reply := resp.Choices[0].Message
@@ -102,7 +103,7 @@ func init() {
 			ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(reply.Content),
 				message.Text("\n本次消耗token: ", resp.Usage.PromptTokens, "+", resp.Usage.CompletionTokens, "=", resp.Usage.TotalTokens))
 		})
-	engine.OnRegex(`^设置\s*OpenAI\s*apikey\s*(.*)$`, zero.OnlyPrivate, getdb).SetBlock(true).Handle(func(ctx *zero.Ctx) {
+	engine.OnRegex(`^设置\s*deepseek\s*apikey\s*(.*)$`, zero.OnlyPrivate, getdb).SetBlock(true).Handle(func(ctx *zero.Ctx) {
 		err := db.insertkey(-ctx.Event.UserID, ctx.State["regex_matched"].([]string)[1])
 		if err != nil {
 			ctx.SendChain(message.Text("ERROR:", err))
@@ -204,7 +205,11 @@ func init() {
 				ctx.SendChain(message.Text("ERROR：", err))
 				return
 			}
-			data, err := web.GetData(fmt.Sprintf(yunURL, yunKey, apiKey))
+			data, err := web.RequestDataWithHeaders(web.NewDefaultClient(), yunURL, "GET", func(r *http.Request) error {
+		r.Header.Set("Accept", "application/json")
+		r.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
+		return nil
+	}, nil)
 			if err != nil {
 				ctx.SendChain(message.Text("请求网站失败,网站可能跑路惹"))
 				return
@@ -216,11 +221,12 @@ func init() {
 				return
 			}
 			var msg strings.Builder
-			msg.WriteString(all.Msg)
-			msg.WriteString("\n总量：$")
+			msg.WriteString("总量：¥")
 			msg.WriteString(all.Data[0].Total)
-			msg.WriteString("\n剩余：$")
-			msg.WriteString(all.Data[0].Available)
+			msg.WriteString("\n赠送：¥")
+			msg.WriteString(all.Data[0].Granted)
+			msg.WriteString("\n充值：¥")
+			msg.WriteString(all.Data[0].Topped)
 			/*msg.WriteString("\n注册时间：")
 			tm := time.Unix(all.EffectiveAt, 0)
 			msg.WriteString(tm.Format("2006-01-02 15:04:05")) // 格式化时间
