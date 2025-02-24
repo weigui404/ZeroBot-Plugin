@@ -14,9 +14,9 @@ import (
 
 func init() {
 	engine := control.AutoRegister(&ctrl.Options[*zero.Ctx]{
-		DisableOnDefault: true,
-		Brief:            "反闪照、反撤回",
-		Help:             "反闪照、反撤回",
+		DisableOnDefault:  true,
+		Brief:             "反闪照、反撤回",
+		Help:              "反闪照、反撤回",
 		PrivateDataFolder: "antirecall",
 	})
 	engine.OnRegex(`^\[CQ:image.*`, zero.KeywordRule("type=flash")).SetBlock(false).
