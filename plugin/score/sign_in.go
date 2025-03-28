@@ -376,8 +376,8 @@ func trySendImage(filePath string, ctx *zero.Ctx) {
 // 从已有签到背景中，复制出一张图片
 func copyImage(picFile string) (err error) {
 	// 读取目录中的文件列表,并随机挑选出一张图片
-	cachePath := engine.DataFolder() + "cache/"
-	files, err := os.ReadDir(cachePath)
+	imagePath := engine.DataFolder() + "cache/img/"
+	files, err := os.ReadDir(imagePath)
 	if err != nil {
 		return err
 	}
@@ -395,7 +395,7 @@ func copyImage(picFile string) (err error) {
 	if len(validFile) == 0 {
 		return errors.New("copyImage: no local image")
 	}
-	selectedFile := cachePath + validFile
+	selectedFile := imagePath + validFile
 
 	// 使用 io.Copy 复制签到背景
 	srcFile, err := os.Open(selectedFile)
