@@ -1,5 +1,5 @@
-// Package bilibili bilibili卡片解析
-package bilibili
+// Package bilibiliparse bilibili卡片解析
+package bilibiliparse
 
 import (
 	"bytes"
@@ -24,9 +24,12 @@ import (
 )
 
 const (
-	enableHex            = 0x10
-	unableHex            = 0x7fffffff_fffffffd
+	enableVideoSummary   = int64(0x10)
+	disableVideoSummary  = ^enableVideoSummary
+	enableVideoDownload  = int64(0x20)
+	disableVideoDownload = ^enableVideoDownload
 	bilibiliparseReferer = "https://www.bilibili.com"
+	ua                   = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36"
 )
 
 var (
@@ -40,11 +43,12 @@ var (
 	searchArticleRe  = regexp.MustCompile(searchArticle)
 	searchLiveRoomRe = regexp.MustCompile(searchLiveRoom)
 	cachePath        string
+	cfg              = bz.NewCookieConfig("data/Bilibili/config.json")
 )
 
 // 插件主体
 func init() {
-	en := control.Register("bilibiliparse", &ctrl.Options[*zero.Ctx]{
+	en := control.AutoRegister(&ctrl.Options[*zero.Ctx]{
 		DisableOnDefault: false,
 		Brief:            "b站链接解析",
 		Help:             "例:- t.bilibili.com/642277677329285174\n- bilibili.com/read/cv17134450\n- bilibili.com/video/BV13B4y1x7pS\n- live.bilibili.com/22603245 ",
@@ -92,9 +96,9 @@ func init() {
 			data := c.GetData(ctx.Event.GroupID)
 			switch option {
 			case "开启", "打开", "启用":
-				data |= enableHex
+				data |= enableVideoSummary
 			case "关闭", "关掉", "禁用":
-				data &= unableHex
+				data &= disableVideoSummary
 			default:
 				return
 			}
@@ -104,6 +108,35 @@ func init() {
 				return
 			}
 			ctx.SendChain(message.Text("已", option, "视频总结"))
+		})
+	en.OnRegex(`^(开启|打开|启用|关闭|关掉|禁用)视频上传$`, zero.AdminPermission).SetBlock(true).
+		Handle(func(ctx *zero.Ctx) {
+			gid := ctx.Event.GroupID
+			if gid <= 0 {
+				// 个人用户设为负数
+				gid = -ctx.Event.UserID
+			}
+			option := ctx.State["regex_matched"].([]string)[1]
+			c, ok := ctx.State["manager"].(*ctrl.Control[*zero.Ctx])
+			if !ok {
+				ctx.SendChain(message.Text("找不到服务!"))
+				return
+			}
+			data := c.GetData(ctx.Event.GroupID)
+			switch option {
+			case "开启", "打开", "启用":
+				data |= enableVideoDownload
+			case "关闭", "关掉", "禁用":
+				data &= disableVideoDownload
+			default:
+				return
+			}
+			err := c.SetData(gid, data)
+			if err != nil {
+				ctx.SendChain(message.Text("出错啦: ", err))
+				return
+			}
+			ctx.SendChain(message.Text("已", option, "视频上传"))
 		})
 	en.OnRegex(searchVideo).SetBlock(true).Limit(limit.LimitByGroup).Handle(handleVideo)
 	en.OnRegex(searchDynamic).SetBlock(true).Limit(limit.LimitByGroup).Handle(handleDynamic)
@@ -121,13 +154,13 @@ func handleVideo(ctx *zero.Ctx) {
 		ctx.SendChain(message.Text("ERROR: ", err))
 		return
 	}
-	msg, err := videoCard2msg(card)
+	msg, err := card.ToVideoMessage()
 	if err != nil {
 		ctx.SendChain(message.Text("ERROR: ", err))
 		return
 	}
 	c, ok := ctx.State["manager"].(*ctrl.Control[*zero.Ctx])
-	if ok && c.GetData(ctx.Event.GroupID)&enableHex == enableHex {
+	if ok && c.GetData(ctx.Event.GroupID)&enableVideoSummary == enableVideoSummary {
 		summaryMsg, err := getVideoSummary(cfg, card)
 		if err != nil {
 			msg = append(msg, message.Text("ERROR: ", err))
@@ -136,16 +169,18 @@ func handleVideo(ctx *zero.Ctx) {
 		}
 	}
 	ctx.SendChain(msg...)
-	downLoadMsg, err := getVideoDownload(cfg, card, cachePath)
-	if err != nil {
-		ctx.SendChain(message.Text("ERROR: ", err))
-		return
+	if ok && c.GetData(ctx.Event.GroupID)&enableVideoDownload == enableVideoDownload {
+		downLoadMsg, err := getVideoDownload(cfg, card, cachePath)
+		if err != nil {
+			ctx.SendChain(message.Text("ERROR: ", err))
+			return
+		}
+		ctx.SendChain(downLoadMsg...)
 	}
-	ctx.SendChain(downLoadMsg...)
 }
 
 func handleDynamic(ctx *zero.Ctx) {
-	msg, err := dynamicDetail(cfg, ctx.State["regex_matched"].([]string)[2])
+	msg, err := cfg.GetDetailMessage(ctx.State["regex_matched"].([]string)[2])
 	if err != nil {
 		ctx.SendChain(message.Text("ERROR: ", err))
 		return
@@ -159,16 +194,21 @@ func handleArticle(ctx *zero.Ctx) {
 		ctx.SendChain(message.Text("ERROR: ", err))
 		return
 	}
-	ctx.SendChain(articleCard2msg(card, ctx.State["regex_matched"].([]string)[1])...)
+	ctx.SendChain(card.ToArticleMessage(ctx.State["regex_matched"].([]string)[1])...)
 }
 
 func handleLive(ctx *zero.Ctx) {
-	card, err := bz.GetLiveRoomInfo(ctx.State["regex_matched"].([]string)[1])
+	cookie, err := cfg.Load()
 	if err != nil {
 		ctx.SendChain(message.Text("ERROR: ", err))
 		return
 	}
-	ctx.SendChain(liveCard2msg(card)...)
+	card, err := bz.GetLiveRoomInfo(ctx.State["regex_matched"].([]string)[1], cookie)
+	if err != nil {
+		ctx.SendChain(message.Text("ERROR: ", err))
+		return
+	}
+	ctx.SendChain(card.ToMessage()...)
 }
 
 // getVideoSummary AI视频总结
