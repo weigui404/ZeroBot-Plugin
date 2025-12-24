@@ -12,17 +12,17 @@ import (
 
 const (
 	// baseURL  = "https://api.openai.com/v1/"
-	proxyURL           = "https://api.deepseek.com/v1/"
+	proxyURL   = "https://api.deepseek.com/v1/"
 	modelTurbo = "deepseek-reasoner"
-	yunURL             = "https://api.deepseek.com/user/balance"
+	yunURL     = "https://api.deepseek.com/user/balance"
 )
 
 type yun struct {
 	Data []struct {
-	    Currency  string `json:"currency"`
-		Total     string `json:"total_balance"`
-		Granted string `json:"granted_balance"`
-		Topped  string `json:"topped_up_balance"`
+		Currency string `json:"currency"`
+		Total    string `json:"total_balance"`
+		Granted  string `json:"granted_balance"`
+		Topped   string `json:"topped_up_balance"`
 	} `json:"balance_infos"`
 }
 

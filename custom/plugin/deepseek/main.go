@@ -206,10 +206,10 @@ func init() {
 				return
 			}
 			data, err := web.RequestDataWithHeaders(web.NewDefaultClient(), yunURL, "GET", func(r *http.Request) error {
-		r.Header.Set("Accept", "application/json")
-		r.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
-		return nil
-	}, nil)
+				r.Header.Set("Accept", "application/json")
+				r.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
+				return nil
+			}, nil)
 			if err != nil {
 				ctx.SendChain(message.Text("请求网站失败,网站可能跑路惹"))
 				return
