@@ -34,12 +34,12 @@ var (
 		Brief:            "OpenAI聊天",
 		Help: "- 设置AI聊天触发概率10\n" +
 			"- 设置AI聊天温度80\n" +
-			"- 设置AI聊天(识图|Agent)接口类型[OpenAI|OLLaMA|GenAI]\n" +
+			"- 设置AI聊天(|识图|Agent)接口类型[OpenAI|OLLaMA|GenAI]\n" +
 			"- 设置AI聊天(不)使用Agent模式\n" +
 			"- 设置AI聊天(不)支持系统提示词\n" +
-			"- 设置AI聊天(识图|Agent)接口地址https://api.siliconflow.cn/v1/chat/completions\n" +
-			"- 设置AI聊天(识图|Agent)密钥xxx\n" +
-			"- 设置AI聊天(识图|Agent)模型名Qwen/Qwen3-8B\n" +
+			"- 设置AI聊天(|识图|Agent)接口地址https://api.siliconflow.cn/v1/chat/completions\n" +
+			"- 设置AI聊天(|识图|Agent)密钥xxx\n" +
+			"- 设置AI聊天(|识图|Agent)模型名Qwen/Qwen3-8B\n" +
 			"- 查看AI聊天系统提示词\n" +
 			"- 重置AI聊天系统提示词\n" +
 			"- 设置AI聊天系统提示词xxx\n" +
@@ -182,17 +182,18 @@ func init() {
 				logrus.Infoln("[aichat] 回复内容:", t)
 				recCfg := airecord.GetConfig()
 				record := ""
-				if !stor.norecord() {
+				if !fastfailnorecord && !stor.norecord() {
 					record = ctx.GetAIRecord(recCfg.ModelID, recCfg.Customgid, t)
-				}
-				if record != "" {
-					ctx.SendChain(message.Record(record))
-				} else {
-					if id != nil {
-						id = ctx.SendChain(message.Reply(id), message.Text(t))
-					} else {
-						id = ctx.SendChain(message.Text(t))
+					if record != "" {
+						ctx.SendChain(message.Record(record))
+						continue
 					}
+					fastfailnorecord = true
+				}
+				if id != nil {
+					id = ctx.SendChain(message.Reply(id), message.Text(t))
+				} else {
+					id = ctx.SendChain(message.Text(t))
 				}
 				process.SleepAbout1sTo2s()
 			}
@@ -247,7 +248,7 @@ func init() {
 	})
 	en.OnPrefix("设置AI聊天分隔符", ensureconfig, zero.OnlyPrivate, zero.SuperUserPermission).SetBlock(true).
 		Handle(newextrasetstr(&cfg.Separator))
-	en.OnRegex("^设置AI聊天(不)?响应AT$", ensureconfig, zero.OnlyPrivate, zero.SuperUserPermission).SetBlock(true).
+	en.OnRegex("^设置AI聊天(不)?响应AT$", ensureconfig, zero.SuperUserPermission).SetBlock(true).
 		Handle(ctxext.NewStorageSaveBoolHandler(bitmapnrat))
 	en.OnRegex("^设置AI聊天(不)?支持系统提示词$", ensureconfig, zero.OnlyPrivate, zero.SuperUserPermission).SetBlock(true).
 		Handle(newextrasetbool(&cfg.NoSystemP))
@@ -259,9 +260,12 @@ func init() {
 		Handle(newextrasetfloat32(&cfg.TopP))
 	en.OnRegex("^设置AI聊天(不)?以AI语音输出$", ensureconfig, zero.AdminPermission).SetBlock(true).
 		Handle(ctxext.NewStorageSaveBoolHandler(bitmapnrec))
-	en.OnFullMatch("查看AI聊天配置", ensureconfig, zero.OnlyPrivate, zero.SuperUserPermission).SetBlock(true).
+	en.OnFullMatch("查看AI聊天配置", ensureconfig, zero.SuperUserPermission).SetBlock(true).
 		Handle(func(ctx *zero.Ctx) {
 			gid := ctx.Event.GroupID
+			if gid == 0 {
+				gid = -ctx.Event.UserID
+			}
 			stor, err := newstorage(ctx, gid)
 			if err != nil {
 				ctx.SendChain(message.Text("ERROR: ", err))
@@ -279,7 +283,7 @@ func init() {
 				message.Text("【当前AI聊天全局配置】\n", &cfg),
 			)
 		})
-	en.OnFullMatch("重置AI聊天", ensureconfig, zero.OnlyPrivate, zero.SuperUserPermission).SetBlock(true).Handle(func(ctx *zero.Ctx) {
+	en.OnFullMatch("重置AI聊天", ensureconfig, zero.SuperUserPermission).SetBlock(true).Handle(func(ctx *zero.Ctx) {
 		chat.ResetChat()
 		ctx.SendChain(message.Text("成功"))
 	})
@@ -321,9 +325,20 @@ func init() {
 			return
 		}
 
-		// 构造总结请求提示
-		summaryPrompt := "请总结这个群聊内容，要求按发言顺序梳理，明确标注每个发言者的昵称，并完整呈现其核心观点、提出的问题、发表的看法或做出的回应，确保不遗漏关键信息，且能体现成员间的对话逻辑和互动关系:\n" +
-			strings.Join(messages, "\n")
+		// 构造总结请求提示 (使用通用版省流提示词)
+		// 使用反引号定义多行字符串，更清晰
+		promptTemplate := `请对以下群聊对话进行【极简总结】。
+要求：
+1. 剔除客套与废话，直击主题。
+2. 使用 Markdown 列表格式。
+3. 按以下结构输出：
+   - 🎯 核心议题：(一句话概括)
+   - 💡 关键观点/结论：(提取3-5个重点)
+   - ✅ 下一步/待办：(如果有，明确谁做什么)
+
+群聊对话内容如下：
+`
+		summaryPrompt := promptTemplate + strings.Join(messages, "\n")
 
 		stor, err := newstorage(ctx, gid)
 		if err != nil {
